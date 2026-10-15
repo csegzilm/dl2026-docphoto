@@ -33,20 +33,38 @@ from src import config
 
 def build_splits(df: pd.DataFrame, group_column: str = "group_strict", val_fraction: float = 0.2,
                  seed: int = config.SPLIT_SEED) -> tuple[np.ndarray, np.ndarray]:
-    """TASK 1. Hold out whole units of `group_column` until at least `val_fraction` of the rows are held out.
-
-    The training set has only six strict units, so which one is held out
-    matters more than how. To make everyone in the room hold out the same
-    one, follow this procedure exactly:
-
-    1. take the distinct values of `group_column` in ascending order;
-    2. shuffle them with `np.random.default_rng(seed).shuffle`;
-    3. move units to the validation side in that order, stopping as soon as
-       the validation side holds at least `val_fraction` of the rows.
-
-    Return (train_idx, val_idx): positional indices into `df`, so that
-    `df.iloc[train_idx]` is the training table whatever the index of `df`
-    looks like. Together they cover every row exactly once, and no value of
-    `group_column` is on both sides.
-    """
-    raise NotImplementedError("TASK 1: the grouped split")
+# 1. take the distinct values of `group_column` in ascending order;
+    groups = np.sort(df[group_column].unique())
+    
+    # 2. shuffle them with `np.random.default_rng(seed).shuffle`;
+    rng = np.random.default_rng(seed)
+    rng.shuffle(groups)
+    
+    # 3. move units to the validation side in that order, stopping as soon as
+    #    the validation side holds at least `val_fraction` of the rows.
+    total_rows = len(df)
+    target_val_rows = total_rows * val_fraction
+    
+    val_groups = set()
+    val_row_count = 0
+    
+    for group in groups:
+        val_groups.add(group)
+        # Hány sor tartozik ehhez a csoporthoz?
+        val_row_count += (df[group_column] == group).sum()
+        
+        # Ha elértük vagy átléptük a kívánt arányt, megállunk
+        if val_row_count >= target_val_rows:
+            break
+            
+    # Pozicionális indexek (0-tól n-ig) előállítása
+    all_indices = np.arange(total_rows)
+    
+    # Kikeressük, mely sorok tartoznak a validációs csoportokba
+    is_val = df[group_column].isin(val_groups).to_numpy()
+    
+    # Szétválasztjuk az indexeket
+    val_idx = all_indices[is_val]
+    train_idx = all_indices[~is_val]
+    
+    return train_idx, val_idx
